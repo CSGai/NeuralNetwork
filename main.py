@@ -97,53 +97,49 @@ def xavier_normal(n_in, n_out) -> np.ndarray:
     return np.random.normal(0, stddev, size=(n_in, n_out))
 
 
-def create_batchs(batch_size: int, output_size: int, csv_dataset: str) -> list:
-    data = np.genfromtxt(csv_dataset, delimiter=',', skip_header=1)
+class BatchManager:
+    def __init__(self, src: str):
+        self.data = np.genfromtxt(src, delimiter=',', skip_header=1)
+        self.batches = None
 
-    labels: list = [data[row, 0].astype(np.uint8) for row in range(len(data))]
-    values: list = [np.array(data[row, 1:]) for row in range(len(data))]
+    def create(self, batch_size: int, output_size: int):
+        labels: list = [self.data[row, 0].astype(np.uint8) for row in range(len(self.data))]
+        values: list = [np.array(self.data[row, 1:]) for row in range(len(self.data))]
 
-    batches: list = []
+        batches: list = []
 
-    for batch_index in range(batch_size):
-        index: int = np.multiply(batch_index, batch_size)
-        lbs: list = []
-        for ldx in labels[index: index + batch_size]:
-            lbs.append(np.array([1 if lb == ldx else 0 for lb in range(output_size)]))
+        for batch_index in range(batch_size):
+            index: int = np.multiply(batch_index, batch_size)
+            lbs: list = []
+            for ldx in labels[index: index + batch_size]:
+                lbs.append(np.array([1 if lb == ldx else 0 for lb in range(output_size)]))
 
-        batch: dict = {
-            'lbs': np.array(labels[index: index + batch_size]),
-            'labels': np.array(lbs),
-            'inputs': np.stack(values[index: index + batch_size])
-        }
-        batches.append(batch)
+            batch: dict = {
+                'labels': np.array(lbs),
+                'inputs': np.stack(values[index: index + batch_size])
+            }
+            batches.append(batch)
 
-    # print(labels[0])
-    # print(len(values[0]))
-    #
-    # reshaped = np.reshape(values[0].tolist(), (28, 28))
-    #
-    # cv2.imshow('image', reshaped)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    return batches
+        self.batches = batches
 
+        return batches
 
-def shuffle(batches: list) -> list:
-    for batch_index in range((len(batches) - 1), 0, -1):
-        randx: int = random.randint(0, batch_index)
-        batches[batch_index], batches[randx] = batches[randx], batches[batch_index]
+    def shuffle(self):
+        batch_list = self.batches
+        for batch_index in range((len(batch_list) - 1), 0, -1):
+            randx: int = random.randint(0, batch_index)
+            batch_list[batch_index], batch_list[randx] = batch_list[randx], batch_list[batch_index]
 
-    return batches
+        return batch_list
 
 
 def main():
     epoch_count = 25
-
     batch_size = 5
     output_size = 10
-    batches = create_batchs(batch_size=batch_size, output_size=output_size, csv_dataset='datasets/mnist_train.csv')
+    mngr = BatchManager(src='datasets/mnist_train.csv')
 
+    batches = mngr.create(batch_size, output_size)
     input_size: int = len(batches[0]['inputs'][0])
 
     layer_sizes: list = [
@@ -157,7 +153,7 @@ def main():
     test = NeuralNetwork(layer_sizes, 0.01)
 
     for epoch_num in range(epoch_count):
-        shuffled_batches = shuffle(batches)
+        shuffled_batches = mngr.shuffle()
 
         for batch in shuffled_batches:
             test.feedforward(batch)
