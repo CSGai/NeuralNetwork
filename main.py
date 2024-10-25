@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from eval import evaluate
 
 
 class NeuralNetwork:
@@ -70,33 +71,6 @@ class NeuralNetwork:
         pass
 
 
-def sigmoid_func(x: np.ndarray) -> np.ndarray:
-    pos_mask = (x >= 0)
-    neg_mask = ~pos_mask
-    result = np.zeros_like(x)
-
-    result[pos_mask] = 1 / (1 + np.exp(-x[pos_mask]))
-    result[neg_mask] = np.exp(x[neg_mask]) / (1 + np.exp(x[neg_mask]))
-    return result
-
-
-def deriv_sigmoid_func(z: np.ndarray) -> np.ndarray:
-    return np.subtract(sigmoid_func(z), np.square(sigmoid_func(z)))
-
-
-def mse_loss_func(predict: np.ndarray, label: np.ndarray) -> np.array:
-    return np.multiply(2, np.square(np.subtract(predict, label)))
-
-
-def init_expected(label: any, node_count: int):
-    return np.array([1 if i == label else 0 for i in range(node_count)])
-
-
-def xavier_normal(n_in, n_out) -> np.ndarray:
-    stddev = np.sqrt(2 / (n_in + n_out))
-    return np.random.normal(0, stddev, size=(n_in, n_out))
-
-
 class BatchManager:
     def __init__(self, src: str):
         self.data = np.genfromtxt(src, delimiter=',', skip_header=1)
@@ -108,7 +82,7 @@ class BatchManager:
 
         batches: list = []
 
-        for batch_index in range(batch_size):
+        for batch_index in range(int(len(labels) / batch_size)):
             index: int = np.multiply(batch_index, batch_size)
             lbs: list = []
             for ldx in labels[index: index + batch_size]:
@@ -133,13 +107,39 @@ class BatchManager:
         return batch_list
 
 
+def sigmoid_func(x: np.ndarray) -> np.ndarray:
+    pos_mask = (x >= 0)
+    neg_mask = ~pos_mask
+    result = np.zeros_like(x)
+
+    result[pos_mask] = 1 / (1 + np.exp(-x[pos_mask]))
+    result[neg_mask] = np.exp(x[neg_mask]) / (1 + np.exp(x[neg_mask]))
+    return result
+
+
+def deriv_sigmoid_func(z: np.ndarray) -> np.ndarray:
+    return np.subtract(sigmoid_func(z), np.square(sigmoid_func(z)))
+
+
+def mse_loss_func(predict: np.ndarray, label: np.ndarray) -> np.array:
+    return np.multiply(2, np.square(np.subtract(predict, label)))
+
+
+def xavier_normal(n_in, n_out) -> np.ndarray:
+    stddev = np.sqrt(2 / (n_in + n_out))
+    return np.random.normal(0, stddev, size=(n_in, n_out))
+
+
 def main():
-    epoch_count = 25
-    batch_size = 5
+
+    epoch_count = 6
+    batch_size = 2
     output_size = 10
+
     mngr = BatchManager(src='datasets/mnist_train.csv')
 
     batches = mngr.create(batch_size, output_size)
+
     input_size: int = len(batches[0]['inputs'][0])
 
     layer_sizes: list = [
@@ -154,13 +154,19 @@ def main():
 
     for epoch_num in range(epoch_count):
         shuffled_batches = mngr.shuffle()
-
+        print('epoch:', epoch_num + 1)
         for batch in shuffled_batches:
             test.feedforward(batch)
             test.train()
 
-    print(test.feedforward(shuffled_batches[0]))
-    print(test.get_loss() / batch_size, shuffled_batches[0]['labels'])
+    mngr2 = BatchManager(src='datasets/mnist_test.csv')
+    batches2 = mngr2.create(1, output_size)
+    # print(batches2[0])
+    batche2 = batches2[0]
+    test_data = [{'inputs': x,
+                  'labels': y} for x, y in zip(batche2['inputs'], batche2['labels'])]
+
+    print('whattttt:', evaluate(test, test_data))
 
     print('\nfinished')
 
